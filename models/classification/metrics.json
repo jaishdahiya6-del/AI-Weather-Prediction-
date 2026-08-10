@@ -1,0 +1,19 @@
+{
+  "results": {
+    "random_forest": {
+      "accuracy": 0.9473,
+      "precision": 0.8321,
+      "recall": 0.6687,
+      "f1": 0.7415,
+      "roc_auc": 0.9817
+    },
+    "xgboost": {
+      "accuracy": 0.9514,
+      "precision": 0.8079,
+      "recall": 0.7485,
+      "f1": 0.7771,
+      "roc_auc": 0.982
+    }
+  },
+  "best_model": "xgboost"
+}

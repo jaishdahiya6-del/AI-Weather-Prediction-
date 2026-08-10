@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest>=8.0
+black>=24.0
+ruff>=0.4
+isort>=5.13

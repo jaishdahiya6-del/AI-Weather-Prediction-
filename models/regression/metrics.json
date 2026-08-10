@@ -1,0 +1,58 @@
+{
+  "temperature": {
+    "results": {
+      "random_forest": {
+        "mae": 0.3131,
+        "rmse": 0.5047,
+        "r2": 0.992,
+        "mape_pct": 8.74
+      },
+      "xgboost": {
+        "mae": 0.2378,
+        "rmse": 0.3638,
+        "r2": 0.9958,
+        "mape_pct": 9.44
+      }
+    },
+    "best_model": "xgboost"
+  },
+  "humidity": {
+    "results": {
+      "random_forest": {
+        "mae": 0.3898,
+        "rmse": 0.5032,
+        "r2": 0.9986,
+        "mape_pct": 0.53
+      },
+      "xgboost": {
+        "mae": 0.2988,
+        "rmse": 0.3656,
+        "r2": 0.9993,
+        "mape_pct": 0.42
+      }
+    },
+    "best_model": "xgboost"
+  },
+  "wind_speed": {
+    "results": {
+      "random_forest": {
+        "mae": 3.1502,
+        "rmse": 4.2261,
+        "r2": 0.786,
+        "mape_pct": 25.52
+      },
+      "xgboost": {
+        "mae": 3.2453,
+        "rmse": 4.3128,
+        "r2": 0.7771,
+        "mape_pct": 26.67
+      }
+    },
+    "best_model": "random_forest"
+  },
+  "rainfall_mm": {
+    "results": null,
+    "best_model": null,
+    "skipped_reason": "Target is constant in this dataset (see data/README.md / scripts/prepare_real_dataset.py for why)."
+  }
+}

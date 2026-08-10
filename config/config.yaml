@@ -1,0 +1,38 @@
+random_seed: 42
+
+data:
+  raw_path: "data/raw/weather_data.csv"
+  processed_path: "data/processed/weather_clean.parquet"
+  demo_mode: true          # true = auto-generate synthetic demo data if raw_path is missing
+  demo_rows: 15000         # only used if raw_path is missing
+  # NOTE: locations below are only used as a UI default; the dashboard always
+  # reads the actual locations from the loaded data, not from here.
+  # weather_data.csv now ships with 56 real locations: 46 Australian BOM
+  # stations (2009-2011, daily), Toronto (2012, hourly), and a live snapshot
+  # of 11 world cities captured 2026-08-09. See scripts/build_multi_location_dataset.py.
+  locations: ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Canberra", "Hobart", "Darwin"]
+
+columns:
+  timestamp: "timestamp"
+  location: "location"
+  target_rain: "rain"
+  target_temperature: "temperature"
+  target_humidity: "humidity"
+  target_wind_speed: "wind_speed"
+  target_rainfall: "rainfall_mm"
+
+features:
+  numeric: ["temperature", "humidity", "pressure", "wind_speed", "cloud_cover", "visibility", "dew_point"]
+  lags_hours: [1, 3, 6, 12, 24]
+  rolling_windows_hours: [3, 6, 12, 24]
+
+lstm:
+  sequence_length: 24
+  forecast_horizon: 1
+  epochs: 15
+  batch_size: 64
+  units: 64
+
+training:
+  test_size_days: 60   # real data is DAILY, so this is 60 days, not 60 hours
+  val_size_days: 60
