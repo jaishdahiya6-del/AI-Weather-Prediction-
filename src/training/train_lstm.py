@@ -43,6 +43,8 @@ def make_sequences(df, seq_len, feature_cols, target_cols):
         for i in range(len(group) - seq_len):
             X.append(feats[i:i + seq_len])
             y.append(targs[i + seq_len])
+    if not X:
+        return np.empty((0, seq_len, len(feature_cols))), np.empty((0, len(target_cols)))
     return np.array(X), np.array(y)
 
 
@@ -72,13 +74,34 @@ def train():
 
     scaler = StandardScaler()
     scaler.fit(train_df[SEQ_FEATURES])
-    for split_df in (train_df, val_df, test_df):
-        split_df[SEQ_FEATURES] = scaler.transform(split_df[SEQ_FEATURES])
+
+    train_df = train_df.copy()
+    train_df[SEQ_FEATURES] = scaler.transform(train_df[SEQ_FEATURES])
 
     seq_len = cfg["lstm"]["sequence_length"]
     X_train, y_train = make_sequences(train_df, seq_len, SEQ_FEATURES, TARGETS)
-    X_val, y_val = make_sequences(val_df, seq_len, SEQ_FEATURES, TARGETS)
-    X_test, y_test = make_sequences(test_df, seq_len, SEQ_FEATURES, TARGETS)
+
+    has_val = len(val_df) > 0
+    if has_val:
+        val_df = val_df.copy()
+        val_df[SEQ_FEATURES] = scaler.transform(val_df[SEQ_FEATURES])
+        X_val, y_val = make_sequences(val_df, seq_len, SEQ_FEATURES, TARGETS)
+    else:
+        split_idx = int(len(X_train) * 0.85)
+        X_val, y_val = X_train[split_idx:], y_train[split_idx:]
+        X_train, y_train = X_train[:split_idx], y_train[:split_idx]
+
+    has_test = len(test_df) > 0
+    if has_test:
+        test_df = test_df.copy()
+        test_df[SEQ_FEATURES] = scaler.transform(test_df[SEQ_FEATURES])
+        X_test, y_test = make_sequences(test_df, seq_len, SEQ_FEATURES, TARGETS)
+    else:
+        X_test, y_test = X_val, y_val
+
+    if len(X_test) == 0:
+        X_test, y_test = X_val, y_val
+
     log.info(f"Sequences -> train {X_train.shape}, val {X_val.shape}, test {X_test.shape}")
 
     out_dir = resolve_path("models/deep_learning")
@@ -98,15 +121,17 @@ def train():
         verbose=2,
     )
 
-    test_loss, test_mae = model.evaluate(X_test, y_test, verbose=0)
+    eval_results = model.evaluate(X_test, y_test, verbose=0)
+    test_loss = float(eval_results[0])
+    test_mae = float(eval_results[1])
     log.info(f"Test MSE={test_loss:.4f} Test MAE={test_mae:.4f}")
 
     joblib.dump(scaler, out_dir / "scaler.joblib")
     joblib.dump({"features": SEQ_FEATURES, "targets": TARGETS, "seq_len": seq_len}, out_dir / "lstm_metadata.joblib")
     with open(out_dir / "metrics.json", "w") as f:
-        json.dump({"test_mse": float(test_loss), "test_mae": float(test_mae)}, f, indent=2)
+        json.dump({"test_mse": test_loss, "test_mae": test_mae}, f, indent=2)
 
-    return {"test_mse": float(test_loss), "test_mae": float(test_mae)}
+    return {"test_mse": test_loss, "test_mae": test_mae}
 
 
 if __name__ == "__main__":

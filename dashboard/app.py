@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import json
+from datetime import datetime
 
 import pandas as pd
 import plotly.express as px
@@ -57,8 +58,6 @@ page = st.sidebar.radio(
 )
 
 df = get_clean_data()
-# Location list comes from the actual loaded data (works for both the demo
-# cities and the bundled real Toronto dataset), not a hardcoded config list.
 locations = sorted(df["location"].unique().tolist())
 selected_location = st.sidebar.selectbox("Location", locations)
 
@@ -96,12 +95,20 @@ elif page == "🌦️ Prediction":
     demo_banner(df)
     predictor = WeatherPredictor(CFG)
 
-    if st.button("Generate Prediction", type="primary"):
+    col_loc, col_date = st.columns([2, 1])
+    with col_loc:
+        custom_city = st.text_input("Enter City/Location Name", value=selected_location)
+    with col_date:
+        use_custom_date = st.checkbox("Select Target Date", value=False)
+        target_date_val = st.date_input("Target Date", value=datetime.now().date()) if use_custom_date else None
+
+    if st.button("Generate Forecast", type="primary"):
         try:
-            result = predictor.predict_location_latest(selected_location)
+            target_date_str = target_date_val.strftime("%Y-%m-%d") if target_date_val else None
+            result = predictor.predict_location_date(custom_city, target_date_str)
             if result.get("is_demo_data"):
                 st.warning("Prediction generated from DEMO DATA — not a real forecast.")
-            st.caption(f"Based on latest available data as of {result['as_of']}")
+            st.caption(f"Forecast for **{result['location']}** based on historical data as of {result['as_of']}")
 
             c1, c2, c3 = st.columns(3)
             c1.metric("🌧️ Rain Probability", f"{result.get('rain_probability', 0):.0f}%")
@@ -124,8 +131,7 @@ elif page == "📅 Forecast":
     st.title("📅 Recent Trend (proxy for forecast view)")
     demo_banner(df)
     loc_df = df[df["location"] == selected_location].sort_values("timestamp").tail(24 * 7)
-    st.caption("Showing the most recent 7 days of historical data for this location. "
-               "Train the LSTM (`python -m src.training.train_lstm`) to enable true multi-step forecasts.")
+    st.caption("Showing the most recent 7 days of historical data for this location.")
 
     for col, label in [("temperature", "Temperature (°C)"), ("rain", "Rain (0/1)"),
                         ("rainfall_mm", "Rainfall (mm)"), ("wind_speed", "Wind Speed (km/h)"),
