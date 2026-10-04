@@ -1,8 +1,11 @@
 import pandas as pd
 import pytest
 
+from src.data.api_fetcher import geocode_city
 from src.data.cleaner import clean_weather_data
 from src.features.feature_engineering import build_features
+from src.models.baseline import evaluate_linear_regression, evaluate_persistence_regressor
+from src.prediction.predictor import WeatherPredictor
 from src.utils.config import load_config
 from src.utils.splitting import time_based_split
 
@@ -75,3 +78,27 @@ def test_time_based_split_no_overlap(raw_demo_df):
         assert train["timestamp"].max() <= val["timestamp"].min()
     if len(val) and len(test):
         assert val["timestamp"].max() <= test["timestamp"].min()
+
+
+def test_geocode_city():
+    res = geocode_city("Sydney")
+    assert res is not None
+    lat, lon, name = res
+    assert pytest.approx(lat, 0.1) == -33.8688
+    assert name == "Sydney"
+
+
+def test_baseline_regressor_evaluation():
+    y_test = pd.Series([10.0, 12.0, 14.0, 16.0])
+    y_lag1 = pd.Series([9.0, 11.0, 13.0, 15.0])
+    res = evaluate_persistence_regressor(y_test, y_lag1)
+    assert "mae" in res
+    assert res["mae"] == 1.0
+
+
+def test_predictor_location_date():
+    predictor = WeatherPredictor()
+    res = predictor.predict_location_date("Toronto", target_date="2012-12-31")
+    assert res["location"] == "Toronto"
+    assert "temperature" in res
+    assert "rain_probability" in res

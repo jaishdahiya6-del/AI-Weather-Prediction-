@@ -2,13 +2,14 @@
 Data cleaning and validation.
 
 Handles: missing values, duplicates, invalid timestamps, domain-range checks,
-and outlier flagging (IQR-based) without blind removal.
+and outlier flagging (IQR-based) without blind removal. Also supports saving clean dataset to parquet.
 """
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 
+from src.utils.config import load_config, resolve_path
 from src.utils.logger import get_logger
 
 log = get_logger(__name__)
@@ -24,7 +25,7 @@ VALID_RANGES = {
 }
 
 
-def clean_weather_data(df: pd.DataFrame) -> pd.DataFrame:
+def clean_weather_data(df: pd.DataFrame, save_processed: bool = False, cfg: dict | None = None) -> pd.DataFrame:
     """Run the full cleaning pipeline and return a clean, sorted DataFrame."""
     df = df.copy()
     n_start = len(df)
@@ -45,8 +46,6 @@ def clean_weather_data(df: pd.DataFrame) -> pd.DataFrame:
         log.info(f"Dropped {n_dup} exact duplicates and {n_dup_key} duplicate (location,timestamp) rows")
 
     # 3. Domain-range validation: values outside physically-possible ranges become NaN
-    #    (kept as missing rather than silently dropped -- distinguishes sensor error from
-    #    genuine extreme events, which fall inside these wide physical bounds)
     for col, (lo, hi) in VALID_RANGES.items():
         if col in df.columns:
             invalid = ~df[col].between(lo, hi) & df[col].notna()
@@ -55,16 +54,13 @@ def clean_weather_data(df: pd.DataFrame) -> pd.DataFrame:
                 df.loc[invalid, col] = np.nan
 
     # 4. Missing value imputation: forward-fill within each location's time series
-    #    (short gaps), then median-fill any remainder. This uses only past values,
-    #    so it does not leak future information.
     df = df.sort_values(["location", "timestamp"])
     numeric_cols = [c for c in VALID_RANGES if c in df.columns]
     for col in numeric_cols:
         df[col] = df.groupby("location")[col].ffill(limit=6)
         df[col] = df[col].fillna(df[col].median())
 
-    # 5. Statistical outlier flagging (IQR) -- flagged, NOT removed, so genuine
-    #    extreme weather events remain in the data for the model to learn from.
+    # 5. Statistical outlier flagging (IQR)
     for col in numeric_cols:
         q1, q3 = df[col].quantile([0.25, 0.75])
         iqr = q3 - q1
@@ -72,7 +68,16 @@ def clean_weather_data(df: pd.DataFrame) -> pd.DataFrame:
         df[f"{col}_is_outlier"] = ~df[col].between(lo, hi)
 
     log.info(f"Cleaning complete: {n_start:,} -> {len(df):,} rows")
-    return df.reset_index(drop=True)
+    cleaned_df = df.reset_index(drop=True)
+
+    if save_processed:
+        cfg = cfg or load_config()
+        processed_path = resolve_path(cfg["data"]["processed_path"])
+        processed_path.parent.mkdir(parents=True, exist_ok=True)
+        cleaned_df.to_parquet(processed_path, index=False)
+        log.info(f"Saved processed clean dataset to {processed_path}")
+
+    return cleaned_df
 
 
 if __name__ == "__main__":
@@ -81,5 +86,5 @@ if __name__ == "__main__":
 
     cfg = load_config()
     raw = load_raw_data(cfg)
-    clean = clean_weather_data(raw)
+    clean = clean_weather_data(raw, save_processed=True, cfg=cfg)
     print(clean.describe())
